@@ -1,0 +1,5 @@
+http://neuralnetworksanddeeplearning.com/chap2.html
+
+$ cd (this_direcory)
+$ conda activaet tf
+$(tf) jupyter notebook

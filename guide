@@ -1,0 +1,114 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+import tensorflow as tf
+print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
+
+
+########### show working gpu #######
+# To find out which devices your operations and tensors are assigned to, 
+# put tf.debugging.set_log_device_placement(True) as the first statement of 
+# your program. Enabling device placement logging causes 
+# any Tensor allocations or operations to be printed.
+tf.debugging.set_log_device_placement(True)
+
+
+############### ANN: Breast cancer detection:  binary classification############
+#df: (569,31)
+#X = df.drop('benign_0__mal_1',axis=1).values
+#y = df['benign_0__mal_1'].values
+#from sklearn.model_selection import train_test_split
+#X_train, X_test, y_train, y_test = train_test_split(X,y,test_size=0.25,random_state=101)
+#X_train.shape : (426,30) #after scaler.fit(X_train) <- scaler = MinMaxScaler() <- from sklearn.preprocessing import MinMaxScaler
+#y_train.shape : (426,)
+################################################################################
+model0 = Sequential()
+model0.add(Dense(units=30,activation='relu'))
+model0.add(Dense(units=15,activation='relu'))
+model0.add(Dense(units=1,activation='sigmoid'))
+# For a binary classification problem
+model0.compile(loss='binary_crossentropy', optimizer='adam')
+
+##option1 : epoch=600
+with tf.device('/GPU:0'):
+    model0.fit(x=X_train, 
+          y=y_train, 
+          epochs=600,  #too many epoch -> overfitting
+          validation_data=(X_test, y_test), verbose=1
+          )
+
+##option2 : early stop: 
+from tensorflow.keras.callbacks import EarlyStopping
+early_stop = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=25)
+
+with tf.device('/GPU:1'):
+    model1.fit(x=X_train1, 
+          y=y_train1, 
+          epochs=600,
+          validation_data=(X_test1, y_test1), verbose=1,
+          callbacks=[early_stop]
+          )
+################# change model to add Dropout layter ############
+##option3 : dropout(0.5) : probability to turn off neurons
+from tensorflow.keras.layers import Dropout
+
+model = Sequential()
+model.add(Dense(units=30,activation='relu'))
+model.add(Dropout(0.5))
+model.add(Dense(units=15,activation='relu'))
+model.add(Dropout(0.5))
+model.add(Dense(units=1,activation='sigmoid'))
+model.compile(loss='binary_crossentropy', optimizer='adam')
+
+model.fit(x=X_train1, 
+          y=y_train1, 
+          epochs=600,
+          validation_data=(X_test1, y_test1), verbose=1,
+          callbacks=[early_stop]
+          )
+
+##################################################################
+#CNN: MNIST(10 digit number) -> output layer with 10 neurons(1 hot-encoding :
+# y_example = to_categorical(y_train) <- from tensoflow.keras.utils import to_categorical )
+##################################################################
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Conv2D, MaxPool2D, Flatten
+
+model = Sequential()
+
+# CONVOLUTIONAL LAYER
+model.add(Conv2D(filters=32, kernel_size=(4,4),input_shape=(28, 28, 1), activation='relu',))
+# POOLING LAYER
+model.add(MaxPool2D(pool_size=(2, 2)))
+
+# FLATTEN IMAGES FROM 28 by 28 to 764 BEFORE FINAL LAYER
+model.add(Flatten())
+
+# 128 NEURONS IN DENSE HIDDEN LAYER (YOU CAN CHANGE THIS NUMBER OF NEURONS)
+model.add(Dense(128, activation='relu'))
+
+# LAST LAYER IS THE Cagegorical CLASSIFIER, THUS 10 POSSIBLE CLASSES-> 10 neurons with softmax activation function.
+# As for binary classication(ex. cat image classify): model.add(Dense(1, activation='sigmoid') -> 1 neuron. 
+model.add(Dense(10, activation='softmax'))
+
+-----------------------
+
+ 
+# https://keras.io/metrics/
+model.compile(loss='categorical_crossentropy',
+              optimizer='adam',
+              metrics=['accuracy']) # we can add in additional metrics https://keras.io/metrics/
+
+------------------------------jupyter kernel dead restrt: solution -------------------------
+# To turn on memory growth for a specific GPU, use the following code 
+# prior to allocating any tensors or executing any ops.gpus = tf.config.experimental.list_physical_devices('GPU')
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+  try:
+    # Currently, memory growth needs to be the same across GPUs
+    for gpu in gpus:
+      tf.config.experimental.set_memory_growth(gpu, True)
+    logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+    print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+  except RuntimeError as e:
+    # Memory growth must be set before GPUs have been initialized
+    print(e)
